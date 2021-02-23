@@ -3,6 +3,7 @@ package redshift
 import (
 	"database/sql"
 	"fmt"
+	"github.com/google/go-cmp/cmp"
 	"log"
 	"strings"
 
@@ -132,8 +133,10 @@ func resourceRedshiftSchemaGroupPrivilegeCreate(d *schema.ResourceData, meta int
 	}
 
 	if isSystemSchema(schemaOwner) {
-		tx.Rollback()
-		return NewError("Privilege creation is not allowed for system schemas, schema=" + schemaName)
+		if isNotPublicSchema(schemaName) {
+			tx.Rollback()
+			return NewError("Privilege creation is not allowed for system schemas, schema=" + schemaName)
+		}
 	}
 
 	groupName, groupErr := GetGroupNameForGroupId(tx, d.Get("group_id").(int))
@@ -180,6 +183,10 @@ func resourceRedshiftSchemaGroupPrivilegeCreate(d *schema.ResourceData, meta int
 
 	tx.Commit()
 	return nil
+}
+
+func isNotPublicSchema(schemaName string) bool {
+	return cmp.Equal(schemaName, "public") == false
 }
 
 func resourceRedshiftSchemaGroupPrivilegeRead(d *schema.ResourceData, meta interface{}) error {
